@@ -1,0 +1,1203 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                      String                  @id @default(uuid())
+  organisationId          String?
+  email                   String                  @unique
+  pendingEmail            String?                 @unique
+  emailVerifiedAt         DateTime?
+  emailVerificationSentAt DateTime?
+  pendingEmailRequestedAt DateTime?
+  pendingEmailSentAt      DateTime?
+  passwordHash            String
+  firstName               String
+  lastName                String
+  phone                   String?
+  gender                  Gender?
+  role                    UserRole                @default(MEMBER)
+  /// Optional FK into the runtime Role table; populated by the reconciliation
+  /// flow. Legacy `role` enum stays as the source of truth until reconciled.
+  roleId                  String?
+  /// Optional FK into the polymorphic OrgUnit substrate (any level). Coexists
+  /// with legacy campusId / orgGroupId — read paths prefer this when set.
+  unitId                  String?
+  campusId                String?
+  orgGroupId              String?
+  avatar                  String?
+  avatarUrl               String?
+  isActive                Boolean                 @default(true)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  bugReports              BugReport[]             @relation("BugReportCreator")
+  adminedCampuses         Campus[]                @relation("CampusAdmin")
+  goalEditRequests        GoalEditRequest[]       @relation("GoalEditRequester")
+  reviewedGoalEdits       GoalEditRequest[]       @relation("GoalEditReviewer")
+  goals                   Goal[]                  @relation("GoalCreator")
+  lockedGoals             Goal[]                  @relation("GoalLocker")
+  createdInviteLinks      InviteLink[]            @relation("InviteLinkCreator")
+  mediaAssets             MediaAsset[]            @relation("MediaAssetOwner")
+  assetUploadSessions     AssetUploadSession[]    @relation("AssetSessionOwner")
+  assetLifecycleEvents    AssetLifecycleEvent[]   @relation("AssetLifecycleActor")
+  emailActionTokens       EmailActionToken[]      @relation("EmailActionTokenOwner")
+  notifications           Notification[]          @relation("NotificationRecipient")
+  ledOrgGroups            OrgGroup[]              @relation("OrgGroupLeader")
+  reviewedEdits           ReportEdit[]            @relation("EditReviewer")
+  reportEdits             ReportEdit[]            @relation("EditSubmitter")
+  reportEvents            ReportEvent[]           @relation("EventActor")
+  lockedMetrics           ReportMetric[]          @relation("MetricLocker")
+  createdTemplateVersions ReportTemplateVersion[] @relation("TemplateVersionCreator")
+  createdTemplates        ReportTemplate[]        @relation("TemplateCreator")
+  reportUpdateRequests    ReportUpdateRequest[]   @relation("UpdateRequester")
+  reviewedUpdates         ReportUpdateRequest[]   @relation("UpdateReviewer")
+  reportVersions          ReportVersion[]         @relation("VersionCreator")
+  approvedReports         Report[]                @relation("ReportApprover")
+  createdReports          Report[]                @relation("ReportCreator")
+  dataEntryReports        Report[]                @relation("DataEntryCreator")
+  reviewedReports         Report[]                @relation("ReportReviewer")
+  submittedReports        Report[]                @relation("ReportSubmitter")
+  adminConfigEntries      AdminConfigEntry[]      @relation("AdminConfigActor")
+  formAssignmentsReceived FormAssignment[]        @relation("FormAssignmentAssignee")
+  formAssignmentsCreated  FormAssignment[]        @relation("FormAssignmentAssigner")
+  formAssignmentRulesOwned FormAssignmentRule[]   @relation("FormAssignmentRuleOwner")
+  formAssignmentRulesAssigned FormAssignmentRule[] @relation("FormAssignmentRuleAssignee")
+  impersonationSessions   ImpersonationSession[] @relation("ImpersonationActor")
+  impersonationTargetedBy ImpersonationSession[] @relation("ImpersonationTarget")
+  importJobs              ImportJob[]             @relation("ImportJobOwner")
+  importMappingProfiles   ImportMappingProfile[]  @relation("ImportMappingOwner")
+  bulkInviteBatches       BulkInviteBatch[]       @relation("BulkInviteCreator")
+  pwaPromptDismissals     PwaPromptDismissal[]    @relation("PwaPromptUser")
+  activationTokens        UserActivationToken[]   @relation("UserActivationOwner")
+  campus                  Campus?                 @relation("CampusUsers", fields: [campusId], references: [id])
+  orgGroup                OrgGroup?               @relation("OrgGroupUsers", fields: [orgGroupId], references: [id])
+  unit                    OrgUnit?                @relation("OrgUnitUsers", fields: [unitId], references: [id])
+  roleEntry               Role?                   @relation("RoleUsers", fields: [roleId], references: [id])
+  ownedUnits              OrgUnit[]               @relation("OrgUnitLeader")
+  ownedAdminUnits         OrgUnit[]               @relation("OrgUnitAdmin")
+
+  @@index([email])
+  @@index([role])
+  @@index([campusId])
+  @@index([orgGroupId])
+  @@index([unitId])
+  @@index([roleId])
+  @@map("users")
+}
+
+model OrgGroup {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  country     String
+  leaderId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  campuses    Campus[] @relation("GroupCampuses")
+  goals       Goal[]   @relation("GoalOrgGroup")
+  leader      User?    @relation("OrgGroupLeader", fields: [leaderId], references: [id])
+  reports     Report[] @relation("ReportOrgGroup")
+  users       User[]   @relation("OrgGroupUsers")
+
+  @@map("org_groups")
+}
+
+model Campus {
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  parentId      String
+  adminId       String?
+  country       String
+  location      String
+  address       String?
+  phone         String?
+  memberCount   Int?          @default(0)
+  inviteCode    String?
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  admin         User?         @relation("CampusAdmin", fields: [adminId], references: [id])
+  orgGroup      OrgGroup      @relation("GroupCampuses", fields: [parentId], references: [id])
+  goals         Goal[]        @relation("GoalCampus")
+  metricEntries MetricEntry[] @relation("MetricEntryCampus")
+  reports       Report[]      @relation("ReportCampus")
+  users         User[]        @relation("CampusUsers")
+
+  @@index([parentId])
+  @@map("campuses")
+}
+
+/* ── Polymorphic Org Units (multi-tree, variable-depth) ────────────────────
+ *
+ * Single substrate for every "scope" the platform tracks. Each row carries a
+ * `level` (admin-defined: GROUP, CAMPUS, DEPARTMENT, ZONE, …), a `parentId`
+ * (self-FK; null for roots) and a `rootKey` that groups roots into trees so
+ * multiple parallel hierarchies can coexist (e.g. "primary" tree of
+ * Group→Campus alongside "departments" tree of Department→Sub-department).
+ *
+ * Migration discipline: every existing Campus + OrgGroup row is back-filled
+ * into this table with the SAME UUID so existing FKs resolve through either
+ * path. Legacy tables stay live as compatibility surfaces; new code reads
+ * org_units exclusively.
+ */
+model OrgUnit {
+  id           String    @id @default(uuid())
+  /// Optional admin-set short slug. Useful for stable cross-tree references.
+  code         String?
+  /// Admin-defined level (e.g. "GROUP", "CAMPUS", "DEPARTMENT"). Free-form
+  /// because the hierarchy admin-config namespace owns the canonical list.
+  level        String
+  name         String
+  description  String?
+  parentId     String?
+  /// Groups roots into separate trees. Default seed value is "primary".
+  rootKey      String    @default("primary")
+  country      String?
+  location     String?
+  address      String?
+  phone        String?
+  leaderId     String?
+  adminId      String?
+  metadata     Json?
+  isActive     Boolean   @default(true)
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  parent       OrgUnit?  @relation("OrgUnitChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children     OrgUnit[] @relation("OrgUnitChildren")
+  leader       User?     @relation("OrgUnitLeader", fields: [leaderId], references: [id])
+  unitAdmin    User?     @relation("OrgUnitAdmin", fields: [adminId], references: [id])
+  users        User[]    @relation("OrgUnitUsers")
+  reports      Report[]  @relation("ReportUnit")
+  scopedRoles  RoleScope[] @relation("OrgUnitRoleScope")
+
+  @@index([rootKey, level])
+  @@index([parentId])
+  @@index([level])
+  @@map("org_units")
+}
+
+/* ── Runtime-managed Role substrate ──────────────────────────────────────
+ *
+ * Built-in roles (one per UserRole enum value) are seeded with `isSystem=true`
+ * so they're protected from delete; SUPERADMIN's capabilities are also
+ * locked. Admins can CREATE custom roles at runtime — they get a fresh UUID,
+ * a unique uppercase code, and a capability subset (cannot grant any of the
+ * SUPERADMIN-only bits).
+ *
+ * `User.roleId` (added above) optionally pins a user to a runtime role row.
+ * When null, code falls back to the legacy `User.role` enum.
+ */
+model Role {
+  id                    String       @id @default(uuid())
+  /// Stable uppercase slug. Built-in roles use the matching UserRole enum value;
+  /// custom roles use any uppercase identifier the admin chooses (uniqueness enforced).
+  code                  String       @unique
+  label                 String
+  description           String?
+  hierarchyOrder        Int          @default(50)
+  dashboardMode         String       @default("scope-overview")
+  reportVisibilityScope String       @default("own")
+  capabilities          Json
+  cadence               Json?
+  /// True for seed roles that mirror the UserRole enum. System roles cannot
+  /// be deleted (only archived) and SUPERADMIN cannot be edited at all.
+  isSystem              Boolean      @default(false)
+  archivedAt            DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  users                 User[]       @relation("RoleUsers")
+  scopes                RoleScope[]  @relation("RoleScopes")
+
+  @@index([archivedAt])
+  @@map("roles")
+}
+
+model RoleScope {
+  id        String   @id @default(uuid())
+  roleId    String
+  unitId    String
+  createdAt DateTime @default(now())
+
+  role      Role     @relation("RoleScopes", fields: [roleId], references: [id], onDelete: Cascade)
+  unit      OrgUnit  @relation("OrgUnitRoleScope", fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, unitId])
+  @@index([unitId])
+  @@map("role_scopes")
+}
+
+model ReportTemplate {
+  id                      String                  @id @default(uuid())
+  organisationId          String
+  name                    String
+  description             String?
+  version                 Int                     @default(1)
+  isActive                Boolean                 @default(true)
+  isDefault               Boolean                 @default(false)
+  createdById             String
+  campusId                String?
+  orgGroupId              String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  deadlineOffsetHours     Int?                    @default(48)
+  deadlinePolicy          ReportDeadlinePolicy?   @default(PERIOD_END)
+  recurrenceFrequency     ReportPeriodType?
+  recurrenceDays          Int[]                   @default([])
+  autoFillTitleTemplate   String?
+  goals                   Goal[]                  @relation("GoalTemplateMetric")
+  sections                ReportTemplateSection[]
+  versions                ReportTemplateVersion[]
+  createdBy               User                    @relation("TemplateCreator", fields: [createdById], references: [id])
+  reports                 Report[]                @relation("ReportTemplate")
+  formAssignmentRules     FormAssignmentRule[]    @relation("FormAssignmentRuleTemplate")
+
+  @@map("report_templates")
+}
+
+model ReportTemplateSection {
+  id               String                 @id @default(uuid())
+  templateId       String
+  name             String
+  description      String?
+  order            Int
+  isRequired       Boolean                @default(true)
+  correlationGroup String?
+  metrics          ReportTemplateMetric[]
+  template         ReportTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("report_template_sections")
+}
+
+model ReportTemplateMetric {
+  id                       String                @id @default(uuid())
+  sectionId                String
+  name                     String
+  description              String?
+  fieldType                MetricFieldType       @default(NUMBER)
+  calculationType          MetricCalculationType @default(SUM)
+  isRequired               Boolean               @default(true)
+  minValue                 Float?
+  maxValue                 Float?
+  order                    Int
+  capturesGoal             Boolean               @default(false)
+  capturesAchieved         Boolean               @default(false)
+  capturesYoY              Boolean               @default(false)
+  capturesWoW              Boolean               @default(false)
+  correlationGroup         String?
+  isAutoTotal              Boolean               @default(false)
+  autoTotalSourceMetricIds String[]              @default([])
+  autoTotalScope           String?               @default("SECTION")
+  goals                    Goal[]                @relation("GoalMetric")
+  metricEntries            MetricEntry[]
+  reportMetrics            ReportMetric[]
+  section                  ReportTemplateSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@map("report_template_metrics")
+}
+
+model ReportTemplateVersion {
+  id            String         @id @default(uuid())
+  templateId    String
+  versionNumber Int
+  snapshot      Json
+  createdAt     DateTime       @default(now())
+  createdById   String
+  createdBy     User           @relation("TemplateVersionCreator", fields: [createdById], references: [id])
+  template      ReportTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("report_template_versions")
+}
+
+model Report {
+  id                String                @id @default(uuid())
+  organisationId    String?
+  title             String?
+  templateId        String
+  templateVersionId String?
+  campusId          String
+  orgGroupId        String
+  /// Optional FK into OrgUnit. Coexists with legacy campusId/orgGroupId
+  /// during the migration window; reads prefer this when set.
+  unitId            String?
+  period            String?
+  periodType        ReportPeriodType
+  periodYear        Int
+  periodMonth       Int?
+  periodWeek        Int?
+  status            ReportStatus          @default(DRAFT)
+  createdById       String?
+  submittedById     String?
+  reviewedById      String?
+  approvedById      String?
+  deadline          DateTime?
+  lockedAt          DateTime?
+  isDataEntry       Boolean               @default(false)
+  dataEntryById     String?
+  dataEntryDate     DateTime?
+  notes             String?
+  autoCreated       Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  edits             ReportEdit[]
+  events            ReportEvent[]
+  sections          ReportSection[]
+  updateRequests    ReportUpdateRequest[]
+  versions          ReportVersion[]
+  formAssignments   FormAssignment[]      @relation("FormAssignmentReport")
+  approvedBy        User?                 @relation("ReportApprover", fields: [approvedById], references: [id])
+  campus            Campus                @relation("ReportCampus", fields: [campusId], references: [id])
+  createdBy         User?                 @relation("ReportCreator", fields: [createdById], references: [id])
+  dataEntryBy       User?                 @relation("DataEntryCreator", fields: [dataEntryById], references: [id])
+  orgGroup          OrgGroup              @relation("ReportOrgGroup", fields: [orgGroupId], references: [id])
+  reviewedBy        User?                 @relation("ReportReviewer", fields: [reviewedById], references: [id])
+  submittedBy       User?                 @relation("ReportSubmitter", fields: [submittedById], references: [id])
+  template          ReportTemplate        @relation("ReportTemplate", fields: [templateId], references: [id])
+  unit              OrgUnit?              @relation("ReportUnit", fields: [unitId], references: [id])
+
+  @@index([campusId])
+  @@index([orgGroupId])
+  @@index([unitId])
+  @@index([templateId])
+  @@index([status])
+  @@index([periodYear, periodMonth])
+  @@map("reports")
+}
+
+model ReportSection {
+  id                String         @id @default(uuid())
+  reportId          String
+  templateSectionId String
+  sectionName       String
+  metrics           ReportMetric[]
+  report            Report         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_sections")
+}
+
+model ReportMetric {
+  id                 String                @id @default(uuid())
+  reportSectionId    String
+  templateMetricId   String
+  metricName         String
+  calculationType    MetricCalculationType @default(SUM)
+  monthlyGoal        Float?
+  monthlyAchieved    Float?
+  yoyGoal            Float?
+  computedPercentage Float?
+  isLocked           Boolean               @default(false)
+  lockedAt           DateTime?
+  lockedById         String?
+  comment            String?
+  lockedBy           User?                 @relation("MetricLocker", fields: [lockedById], references: [id])
+  section            ReportSection         @relation(fields: [reportSectionId], references: [id], onDelete: Cascade)
+  templateMetric     ReportTemplateMetric  @relation(fields: [templateMetricId], references: [id])
+
+  @@index([reportSectionId])
+  @@index([templateMetricId])
+  @@map("report_metrics")
+}
+
+model ReportEdit {
+  id            String           @id @default(uuid())
+  reportId      String
+  submittedById String
+  status        ReportEditStatus @default(DRAFT)
+  reason        String
+  sections      Json
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  report        Report           @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reviewedBy    User?            @relation("EditReviewer", fields: [reviewedById], references: [id])
+  submittedBy   User             @relation("EditSubmitter", fields: [submittedById], references: [id])
+
+  @@index([reportId])
+  @@map("report_edits")
+}
+
+model ReportUpdateRequest {
+  id            String                    @id @default(uuid())
+  reportId      String
+  requestedById String
+  reason        String
+  sections      Json
+  status        ReportUpdateRequestStatus @default(PENDING)
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  report        Report                    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  requestedBy   User                      @relation("UpdateRequester", fields: [requestedById], references: [id])
+  reviewedBy    User?                     @relation("UpdateReviewer", fields: [reviewedById], references: [id])
+
+  @@index([reportId])
+  @@map("report_update_requests")
+}
+
+model ReportEvent {
+  id             String          @id @default(uuid())
+  reportId       String
+  eventType      ReportEventType
+  actorId        String
+  timestamp      DateTime        @default(now())
+  details        String?
+  previousStatus ReportStatus?
+  newStatus      ReportStatus?
+  snapshotId     String?
+  actor          User            @relation("EventActor", fields: [actorId], references: [id])
+  report         Report          @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([eventType])
+  @@map("report_events")
+}
+
+model ReportVersion {
+  id            String   @id @default(uuid())
+  reportId      String
+  versionNumber Int
+  snapshot      Json
+  createdAt     DateTime @default(now())
+  createdById   String
+  reason        String?
+  createdBy     User     @relation("VersionCreator", fields: [createdById], references: [id])
+  report        Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_versions")
+}
+
+model Goal {
+  id               String               @id @default(uuid())
+  campusId         String
+  orgGroupId       String?
+  templateId       String?
+  templateMetricId String
+  metricName       String
+  mode             GoalMode             @default(ANNUAL)
+  year             Int
+  month            Int?
+  targetValue      Float
+  isLocked         Boolean              @default(false)
+  lockedAt         DateTime?
+  lockedById       String?
+  createdById      String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  editRequests     GoalEditRequest[]
+  campus           Campus               @relation("GoalCampus", fields: [campusId], references: [id])
+  createdBy        User                 @relation("GoalCreator", fields: [createdById], references: [id])
+  lockedBy         User?                @relation("GoalLocker", fields: [lockedById], references: [id])
+  orgGroup         OrgGroup?            @relation("GoalOrgGroup", fields: [orgGroupId], references: [id])
+  template         ReportTemplate?      @relation("GoalTemplateMetric", fields: [templateId], references: [id])
+  templateMetric   ReportTemplateMetric @relation("GoalMetric", fields: [templateMetricId], references: [id])
+
+  @@unique([campusId, templateMetricId, year, mode, month])
+  @@index([campusId, templateMetricId, year])
+  @@map("goals")
+}
+
+model GoalEditRequest {
+  id            String                @id @default(uuid())
+  goalId        String
+  requestedById String
+  reason        String
+  proposedValue Float
+  status        GoalEditRequestStatus @default(PENDING)
+  reviewedById  String?
+  reviewNotes   String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  goal          Goal                  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  requestedBy   User                  @relation("GoalEditRequester", fields: [requestedById], references: [id])
+  reviewedBy    User?                 @relation("GoalEditReviewer", fields: [reviewedById], references: [id])
+
+  @@index([goalId])
+  @@map("goal_edit_requests")
+}
+
+model MetricEntry {
+  id                 String               @id @default(uuid())
+  reportMetricId     String?
+  templateMetricId   String
+  campusId           String
+  year               Int
+  month              Int
+  goalValue          Float?
+  achievedValue      Float?
+  comment            String?
+  computedPercentage Float?
+  createdAt          DateTime             @default(now())
+  campus             Campus               @relation("MetricEntryCampus", fields: [campusId], references: [id])
+  templateMetric     ReportTemplateMetric @relation(fields: [templateMetricId], references: [id])
+
+  @@index([campusId, templateMetricId, year, month])
+  @@map("metric_entries")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  relatedId String?
+  reportId  String?
+  read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation("NotificationRecipient", fields: [userId], references: [id])
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model EmailActionToken {
+  id            String          @id @default(uuid())
+  userId        String
+  type          EmailActionType
+  tokenHash     String          @unique
+  targetEmail   String?
+  expiresAt     DateTime
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation("EmailActionTokenOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, usedAt])
+  @@index([expiresAt])
+  @@map("email_action_tokens")
+}
+
+model InviteLink {
+  id             String            @id @default(uuid())
+  token          String            @unique
+  type           InviteLinkType
+  targetId       String?
+  targetRole     UserRole?
+  /// Optional FK into Role table for runtime-defined roles; falls back to
+  /// the legacy targetRole enum during the cut-over.
+  targetRoleId   String?
+  campusId       String?
+  groupId        String?
+  /// Optional polymorphic OrgUnit scope; when set, the invitee inherits this
+  /// unit on activation (legacy campusId/groupId still respected).
+  unitId         String?
+  note           String?
+  createdById    String
+  usedAt         DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean           @default(true)
+  recipientEmail String?
+  batchId        String?
+  createdAt      DateTime          @default(now())
+  createdBy      User              @relation("InviteLinkCreator", fields: [createdById], references: [id])
+  batch          BulkInviteBatch?  @relation("InviteLinkBatch", fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([token])
+  @@index([batchId])
+  @@index([unitId])
+  @@map("invite_links")
+}
+
+model BugReport {
+  id                String            @id @default(uuid())
+  category          BugReportCategory
+  description       String
+  screenshotUrl     String?
+  screenshotAssetId String?
+  contactEmail      String
+  status            BugReportStatus   @default(OPEN)
+  adminNotes        String?
+  createdById       String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  createdBy         User              @relation("BugReportCreator", fields: [createdById], references: [id])
+  screenshotAsset   MediaAsset?       @relation("BugReportScreenshotAsset", fields: [screenshotAssetId], references: [id])
+
+  @@index([status])
+  @@index([createdById])
+  @@index([screenshotAssetId])
+  @@map("bug_reports")
+}
+
+model MediaAsset {
+  id                     String                @id @default(uuid())
+  ownerId                String
+  domain                 AssetDomain
+  provider               AssetProvider         @default(CLOUDINARY)
+  state                  AssetState            @default(TEMP)
+  publicId               String?               @unique
+  secureUrl              String?
+  resourceType           String?               @default("image")
+  format                 String?
+  bytes                  Int?
+  width                  Int?
+  height                 Int?
+  mimeType               String?
+  originalFileName       String?
+  folder                 String?
+  metadata               Json?
+  requestId              String?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  finalizedAt            DateTime?
+  discardedAt            DateTime?
+  expiresAt              DateTime?
+  owner                  User                  @relation("MediaAssetOwner", fields: [ownerId], references: [id])
+  bugReportsAsScreenshot BugReport[]           @relation("BugReportScreenshotAsset")
+  uploadSessions         AssetUploadSession[]  @relation("AssetSessionAsset")
+  lifecycleEvents        AssetLifecycleEvent[] @relation("AssetEventAsset")
+
+  @@index([ownerId, state])
+  @@index([domain, state])
+  @@index([createdAt])
+  @@map("media_assets")
+}
+
+model AssetUploadSession {
+  id              String                @id @default(uuid())
+  ownerId         String
+  domain          AssetDomain
+  mode            AssetUploadMode       @default(DEFERRED_SUBMIT)
+  state           AssetSessionState     @default(OPEN)
+  activeAssetId   String?
+  idempotencyKey  String?
+  requestId       String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  finalizedAt     DateTime?
+  discardedAt     DateTime?
+  expiresAt       DateTime?
+  owner           User                  @relation("AssetSessionOwner", fields: [ownerId], references: [id])
+  activeAsset     MediaAsset?           @relation("AssetSessionAsset", fields: [activeAssetId], references: [id])
+  lifecycleEvents AssetLifecycleEvent[] @relation("AssetEventSession")
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([ownerId, state])
+  @@index([domain, state])
+  @@index([expiresAt])
+  @@map("asset_upload_sessions")
+}
+
+model AssetLifecycleEvent {
+  id        String                  @id @default(uuid())
+  sessionId String?
+  assetId   String?
+  actorId   String?
+  eventType AssetLifecycleEventType
+  details   Json?
+  requestId String?
+  createdAt DateTime                @default(now())
+  session   AssetUploadSession?     @relation("AssetEventSession", fields: [sessionId], references: [id], onDelete: SetNull)
+  asset     MediaAsset?             @relation("AssetEventAsset", fields: [assetId], references: [id], onDelete: SetNull)
+  actor     User?                   @relation("AssetLifecycleActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([assetId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("asset_lifecycle_events")
+}
+
+/* ── Admin Config + Form Assignments + Imports + Bulk Invites + PWA + Activation ── */
+
+model AdminConfigEntry {
+  id         String   @id @default(uuid())
+  namespace  String
+  version    Int      @default(1)
+  payload    Json
+  isFallback Boolean  @default(false)
+  actorId    String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AdminConfigActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([namespace, version])
+  @@index([namespace, createdAt])
+  @@map("admin_config_entries")
+}
+
+model FormAssignment {
+  id           String    @id @default(uuid())
+  reportId     String
+  assigneeId   String
+  assignedById String
+  metricIds    String[]
+  dueAt        DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  notes        String?
+  ruleId       String?
+  periodKey    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  report     Report              @relation("FormAssignmentReport", fields: [reportId], references: [id], onDelete: Cascade)
+  assignee   User                @relation("FormAssignmentAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  assignedBy User                @relation("FormAssignmentAssigner", fields: [assignedById], references: [id], onDelete: Cascade)
+  rule       FormAssignmentRule? @relation("FormAssignmentRuleAssignments", fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([assigneeId, completedAt])
+  @@index([reportId])
+  @@index([ruleId, periodKey])
+  @@map("form_assignments")
+}
+
+model FormAssignmentRule {
+  id              String           @id @default(uuid())
+  ownerId         String
+  templateId      String
+  role            UserRole?
+  /// Optional FK into Role table; when present takes precedence over the
+  /// legacy `role` enum. Legacy column stays readable for back-compat.
+  roleId          String?
+  assigneeId      String?
+  campusId        String?
+  orgGroupId      String?
+  campusIds       String[]         @default([])
+  orgGroupIds     String[]         @default([])
+  /// Polymorphic scope — any OrgUnit ids at any level. Empty array = applies
+  /// to every unit. New writes prefer this; legacy `campusIds`/`orgGroupIds`
+  /// remain readable so existing rules continue to materialise.
+  unitIds         String[]         @default([])
+  metricIds       String[]
+  cadenceOverride Json?
+  isActive        Boolean          @default(true)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  owner       User             @relation("FormAssignmentRuleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  template    ReportTemplate   @relation("FormAssignmentRuleTemplate", fields: [templateId], references: [id], onDelete: Cascade)
+  assignee    User?            @relation("FormAssignmentRuleAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignments FormAssignment[] @relation("FormAssignmentRuleAssignments")
+
+  @@index([templateId, isActive])
+  @@index([role, isActive])
+  @@index([assigneeId, isActive])
+  @@map("form_assignment_rules")
+}
+
+model ImportJob {
+  id                 String              @id @default(uuid())
+  ownerId            String
+  templateId         String?
+  status             ImportJobStatus     @default(DRAFT)
+  fileName           String?
+  fileMime           String?
+  fileBytes          Int?
+  /// "CSV" or "XLSX". When XLSX, `storageRef` is base64-encoded bytes;
+  /// when CSV (or unset for legacy rows), `storageRef` is raw text.
+  fileFormat         String?
+  /// For multi-sheet xlsx, the user-chosen sheet name. Null = first sheet.
+  selectedSheet      String?
+  storageRef         String?
+  mappingProfileId   String?
+  mapping            Json?
+  validationSummary  Json?
+  commitSummary      Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  owner          User                   @relation("ImportJobOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  mappingProfile ImportMappingProfile?  @relation("ImportJobProfile", fields: [mappingProfileId], references: [id], onDelete: SetNull)
+  items          ImportJobItem[]        @relation("ImportJobItems")
+
+  @@index([ownerId, status])
+  @@map("import_jobs")
+}
+
+model ImportJobItem {
+  id                String             @id @default(uuid())
+  jobId             String
+  rowIndex          Int
+  rawValues         Json
+  normalizedValues  Json?
+  outcome           ImportRowOutcome   @default(OK)
+  errors            String[]
+  createdAt         DateTime           @default(now())
+
+  job ImportJob @relation("ImportJobItems", fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, outcome])
+  @@map("import_job_items")
+}
+
+model ImportMappingProfile {
+  id         String   @id @default(uuid())
+  ownerId    String
+  templateId String?
+  name       String
+  mapping    Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  owner User        @relation("ImportMappingOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  jobs  ImportJob[] @relation("ImportJobProfile")
+
+  @@index([ownerId, templateId])
+  @@map("import_mapping_profiles")
+}
+
+model BulkInviteBatch {
+  id            String           @id @default(uuid())
+  createdById   String
+  kind          BulkInviteKind
+  sharedAttrs   Json?
+  totalEntries  Int              @default(0)
+  successCount  Int              @default(0)
+  skippedCount  Int              @default(0)
+  failedCount   Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  createdBy User         @relation("BulkInviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  invites   InviteLink[] @relation("InviteLinkBatch")
+
+  @@index([createdById, createdAt])
+  @@map("bulk_invite_batches")
+}
+
+model PwaPromptDismissal {
+  id              String              @id @default(uuid())
+  userId          String
+  kind            PwaPromptKind
+  platform        PwaPromptPlatform
+  mode            PwaDismissalMode    @default(snooze)
+  nextEligibleAt  DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  user User @relation("PwaPromptUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, platform])
+  @@map("pwa_prompt_dismissals")
+}
+
+model UserActivationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation("UserActivationOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("user_activation_tokens")
+}
+
+/* ── Superadmin role-impersonation / preview ───────────────────────────── */
+
+model ImpersonationSession {
+  id                  String                @id @default(uuid())
+  superadminId        String
+  impersonatedRole    UserRole
+  impersonatedUserId  String?
+  mode                ImpersonationMode     @default(READ_ONLY)
+  startedAt           DateTime              @default(now())
+  expiresAt           DateTime
+  endedAt             DateTime?
+  endedReason         ImpersonationEndReason?
+  eventCount          Int                   @default(0)
+
+  superadmin       User                   @relation("ImpersonationActor", fields: [superadminId], references: [id], onDelete: Cascade)
+  impersonatedUser User?                  @relation("ImpersonationTarget", fields: [impersonatedUserId], references: [id], onDelete: SetNull)
+  events           ImpersonationEvent[]   @relation("ImpersonationSessionEvents")
+
+  @@index([superadminId, endedAt])
+  @@index([startedAt])
+  @@map("impersonation_sessions")
+}
+
+model ImpersonationEvent {
+  id            String                  @id @default(uuid())
+  sessionId     String
+  type          ImpersonationEventType
+  path          String?
+  method        String?
+  status        Int?
+  requestId     String?
+  payloadDigest String?
+  createdAt     DateTime                @default(now())
+
+  session ImpersonationSession @relation("ImpersonationSessionEvents", fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([type, createdAt])
+  @@map("impersonation_events")
+}
+
+enum UserRole {
+  SUPERADMIN
+  SPO
+  CEO
+  CHURCH_MINISTRY
+  GROUP_PASTOR
+  GROUP_ADMIN
+  CAMPUS_PASTOR
+  CAMPUS_ADMIN
+  DATA_ENTRY
+  MEMBER
+  OFFICE_OF_CEO
+  USHER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  REQUIRES_EDITS
+  APPROVED
+  REVIEWED
+  LOCKED
+}
+
+enum ReportPeriodType {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum ReportDeadlinePolicy {
+  PERIOD_START
+  PERIOD_MIDDLE
+  PERIOD_END
+  AFTER_PERIOD_HOURS
+}
+
+enum MetricFieldType {
+  NUMBER
+  PERCENTAGE
+  TEXT
+  CURRENCY
+}
+
+enum MetricCalculationType {
+  SUM
+  AVERAGE
+  SNAPSHOT
+}
+
+enum ReportEventType {
+  CREATED
+  SUBMITTED
+  EDIT_REQUESTED
+  EDIT_SUBMITTED
+  EDIT_APPROVED
+  EDIT_REJECTED
+  EDIT_APPLIED
+  APPROVED
+  REVIEWED
+  LOCKED
+  DEADLINE_PASSED
+  UPDATE_REQUESTED
+  UPDATE_APPROVED
+  UPDATE_REJECTED
+  DATA_ENTRY_CREATED
+  TEMPLATE_VERSION_NOTE
+  AUTO_APPROVED
+  UNLOCKED
+}
+
+enum ReportEditStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ReportUpdateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  REPORT_SUBMITTED
+  REPORT_EDIT_REQUESTED
+  REPORT_APPROVED
+  REPORT_REVIEWED
+  REPORT_LOCKED
+  REPORT_EDIT_SUBMITTED
+  REPORT_EDIT_APPROVED
+  REPORT_EDIT_REJECTED
+  REPORT_UPDATE_REQUESTED
+  REPORT_UPDATE_APPROVED
+  REPORT_UPDATE_REJECTED
+  REPORT_DEADLINE_REMINDER
+  GOAL_UNLOCK_REQUESTED
+  GOAL_UNLOCK_APPROVED
+  GOAL_UNLOCK_REJECTED
+  REPORT_UNLOCKED
+  EMAIL_VERIFICATION_REQUIRED
+  EMAIL_VERIFIED
+  EMAIL_CHANGE_REQUESTED
+  EMAIL_CHANGED
+}
+
+enum EmailActionType {
+  VERIFY_PRIMARY_EMAIL
+  CONFIRM_PENDING_EMAIL
+}
+
+enum GoalMode {
+  ANNUAL
+  MONTHLY
+  CAMPUS_OVERRIDE
+}
+
+enum GoalEditRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum InviteLinkType {
+  CAMPUS
+  GROUP
+  DIRECT
+}
+
+enum BugReportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum BugReportCategory {
+  UI_DISPLAY
+  NAVIGATION
+  DATA_ISSUE
+  PERFORMANCE
+  AUTHENTICATION
+  REPORT_SUBMISSION
+  NOTIFICATION
+  OTHER
+}
+
+enum AssetDomain {
+  BUG_REPORT_SCREENSHOT
+}
+
+enum AssetProvider {
+  CLOUDINARY
+  LEGACY_URL
+}
+
+enum AssetState {
+  TEMP
+  READY
+  DISCARDED
+  DELETE_PENDING
+  DELETED
+  FAILED
+}
+
+enum AssetUploadMode {
+  DEFERRED_SUBMIT
+  PREUPLOAD_DRAFT
+}
+
+enum AssetSessionState {
+  OPEN
+  TEMP_UPLOADED
+  FINALIZED
+  DISCARDED
+  EXPIRED
+}
+
+enum AssetLifecycleEventType {
+  SESSION_CREATED
+  TEMP_UPLOADED
+  FINALIZED
+  DISCARDED
+  CLEANUP_DELETED
+  CLEANUP_FAILED
+  COMPENSATION_DELETED
+  COMPENSATION_FAILED
+}
+
+enum ImportJobStatus {
+  DRAFT
+  FILE_UPLOADED
+  MAPPED
+  VALIDATED
+  COMMITTED
+  FAILED
+  CANCELLED
+}
+
+enum ImportRowOutcome {
+  OK
+  WARNING
+  ERROR
+  COMMITTED
+}
+
+enum BulkInviteKind {
+  INVITE_LINK
+  PRE_REGISTER
+}
+
+enum PwaPromptKind {
+  INSTALL
+  PUSH
+}
+
+enum PwaPromptPlatform {
+  IOS
+  ANDROID
+  DESKTOP
+}
+
+enum PwaDismissalMode {
+  snooze
+  never
+}
+
+enum ImpersonationMode {
+  READ_ONLY
+  MUTATE
+}
+
+enum ImpersonationEndReason {
+  USER
+  EXPIRED
+  TOKEN_INVALIDATED
+}
+
+enum ImpersonationEventType {
+  STARTED
+  STOPPED
+  MODE_CHANGED
+  MUTATION_BLOCKED
+  MUTATION_APPLIED
+  PAGE_VISITED
+  AUTH_REJECTED
+  EVENT_LIMIT_REACHED
+}
