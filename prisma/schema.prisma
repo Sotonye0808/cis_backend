@@ -1,0 +1,235 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum UserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+    PENDING
+}
+
+enum RoleScope {
+    GLOBAL
+    ORG_GROUP
+    CAMPUS
+    PLATFORM
+}
+
+enum MappingStatus {
+    ACTIVE
+    INACTIVE
+    PENDING
+    SYNC_FAILED
+}
+
+enum IdentityEventType {
+    USER_CREATED
+    USER_UPDATED
+    USER_DEACTIVATED
+    ROLE_CREATED
+    ROLE_ASSIGNED
+    ROLE_REVOKED
+    PLATFORM_LINKED
+    PLATFORM_UNLINKED
+    CONFIG_CHANGED
+}
+
+enum ConfigValueType {
+    JSON
+    STRING
+    NUMBER
+    BOOLEAN
+}
+
+enum ConfigScope {
+    GLOBAL
+    PLATFORM
+    ORG_GROUP
+    CAMPUS
+}
+
+model CanonicalUser {
+    id              String     @id @default(uuid()) @db.Uuid
+    email           String     @unique
+    firstName       String?
+    lastName        String?
+    phoneNumber     String?
+    whatsappNumber  String?
+    profileImageUrl String?
+    status          UserStatus @default(ACTIVE)
+    metadata        Json?
+    isDeleted       Boolean    @default(false)
+    createdAt       DateTime   @default(now())
+    updatedAt       DateTime   @updatedAt
+
+    userRoles        UserRole[]
+    platformMappings PlatformUserMapping[]
+    leaderOfGroups   OrgGroup[]            @relation("OrgGroupLeader")
+    adminOfCampuses  Campus[]              @relation("CampusAdmin")
+    configEntries    ConfigEntry[]         @relation("ConfigActor")
+
+    @@index([email])
+    @@map("canonical_users")
+}
+
+model CanonicalRole {
+    id          String    @id @default(cuid())
+    platformId  String
+    roleKey     String
+    displayName String
+    scope       RoleScope @default(GLOBAL)
+    inherits    String[]  @default([])
+    permissions String[]  @default([])
+    isActive    Boolean   @default(true)
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    userRoles      UserRole[]
+    permissionsRef RolePermission[]
+
+    @@unique([platformId, roleKey])
+    @@index([platformId])
+    @@map("canonical_roles")
+}
+
+model UserRole {
+    id         String    @id @default(cuid())
+    userId     String    @db.Uuid
+    roleId     String
+    scopeId    String?
+    assignedAt DateTime  @default(now())
+    expiresAt  DateTime?
+
+    user CanonicalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+    role CanonicalRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, roleId, scopeId])
+    @@index([userId])
+    @@index([roleId])
+    @@map("user_roles")
+}
+
+model RolePermission {
+    id            String   @id @default(cuid())
+    roleId        String
+    permissionKey String
+    metadata      Json?
+    createdAt     DateTime @default(now())
+
+    role CanonicalRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+    @@unique([roleId, permissionKey])
+    @@index([permissionKey])
+    @@map("role_permissions")
+}
+
+model PlatformUserMapping {
+    id              String        @id @default(cuid())
+    canonicalUserId String        @db.Uuid
+    platformId      String
+    externalUserId  String
+    status          MappingStatus @default(ACTIVE)
+    syncedAt        DateTime      @default(now())
+    createdAt       DateTime      @default(now())
+    updatedAt       DateTime      @updatedAt
+
+    canonicalUser CanonicalUser @relation(fields: [canonicalUserId], references: [id], onDelete: Cascade)
+
+    @@unique([platformId, externalUserId])
+    @@unique([canonicalUserId, platformId])
+    @@index([platformId])
+    @@map("platform_user_mappings")
+}
+
+model OrgGroup {
+    id          String   @id @default(uuid()) @db.Uuid
+    name        String
+    description String?
+    country     String
+    leaderId    String?  @db.Uuid
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    leader   CanonicalUser? @relation("OrgGroupLeader", fields: [leaderId], references: [id])
+    campuses Campus[]
+
+    @@map("org_groups")
+}
+
+model Campus {
+    id          String   @id @default(uuid()) @db.Uuid
+    orgGroupId  String   @db.Uuid
+    name        String
+    description String?
+    country     String
+    adminId     String?  @db.Uuid
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    orgGroup OrgGroup       @relation(fields: [orgGroupId], references: [id], onDelete: Cascade)
+    admin    CanonicalUser? @relation("CampusAdmin", fields: [adminId], references: [id])
+
+    @@index([orgGroupId])
+    @@map("campuses")
+}
+
+model IdentityEvent {
+    id            String            @id @default(cuid())
+    eventId       String            @unique @default(cuid())
+    eventType     IdentityEventType
+    aggregateId   String
+    aggregateType String
+    data          Json
+    metadata      Json?
+    actorId       String?           @db.Uuid
+    createdAt     DateTime          @default(now())
+
+    outbox IdentityEventOutbox?
+
+    @@index([aggregateId])
+    @@index([eventType])
+    @@map("identity_events")
+}
+
+model IdentityEventOutbox {
+    id                  String    @id @default(cuid())
+    eventId             String    @unique
+    processingStartedAt DateTime?
+    processedAt         DateTime?
+    failureCount        Int       @default(0)
+    lastError           String?
+    createdAt           DateTime  @default(now())
+
+    event IdentityEvent @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+
+    @@index([processedAt])
+    @@map("identity_event_outbox")
+}
+
+model ConfigEntry {
+    id         String          @id @default(cuid())
+    namespace  String
+    key        String
+    value      Json
+    version    Int
+    valueType  ConfigValueType @default(JSON)
+    scope      ConfigScope     @default(GLOBAL)
+    isFallback Boolean         @default(false)
+    actorId    String?         @db.Uuid
+    notes      String?
+    createdAt  DateTime        @default(now())
+    updatedAt  DateTime        @updatedAt
+
+    actor CanonicalUser? @relation("ConfigActor", fields: [actorId], references: [id])
+
+    @@unique([namespace, key, version])
+    @@index([namespace, key])
+    @@map("config_entries")
+}
