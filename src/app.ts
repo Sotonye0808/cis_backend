@@ -53,6 +53,10 @@ export function createApp(deps?: {
         maxRequests: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 30),
         windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 60_000)
     });
+    const permissionRouteRateLimit = createRateLimitMiddleware({
+        maxRequests: Number(process.env.PERMISSION_RATE_LIMIT_MAX ?? 120),
+        windowMs: Number(process.env.PERMISSION_RATE_LIMIT_WINDOW_MS ?? 60_000)
+    });
 
     const app = express();
 
@@ -69,7 +73,12 @@ export function createApp(deps?: {
     app.use('/api/v1/roles', createRoleRouter(roleService));
     app.use('/api/v1/org', createOrgRouter(orgService));
     app.use('/api/v1/auth', authRouteRateLimit, createAuthRouter(authService));
-    app.use('/api/v1/permissions', authMiddleware, createPermissionRouter(permissionService));
+    app.use(
+        '/api/v1/permissions',
+        permissionRouteRateLimit,
+        authMiddleware,
+        createPermissionRouter(permissionService)
+    );
 
     app.use((_req, res) => {
         res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
