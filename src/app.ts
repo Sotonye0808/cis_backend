@@ -6,30 +6,48 @@ import { errorHandler } from './api/middleware/errorHandler';
 import { createUserRouter } from './api/routes/users';
 import { createRoleRouter } from './api/routes/roles';
 import { createOrgRouter } from './api/routes/org';
+import { createAuthRouter } from './api/routes/auth';
+import { createPermissionRouter } from './api/routes/permissions';
+import { createAuthMiddleware } from './api/middleware/auth';
 import { createIdentityService } from './services/identityService';
 import { createRoleService } from './services/roleService';
 import { createOrgService } from './services/orgService';
 import { createPermissionService } from './services/permissionService';
+import { createAuthService } from './services/authService';
+import { createConfigService } from './services/configService';
 import { createUserRepository } from './repositories/userRepository';
 import { createRoleRepository } from './repositories/roleRepository';
 import { createOrgRepository } from './repositories/orgRepository';
 import { createPermissionRepository } from './repositories/permissionRepository';
+import { createConfigRepository } from './repositories/configRepository';
 import { prisma } from './lib/prisma';
 
 export function createApp(deps?: {
     identityService?: ReturnType<typeof createIdentityService>;
     roleService?: ReturnType<typeof createRoleService>;
     orgService?: ReturnType<typeof createOrgService>;
+    authService?: ReturnType<typeof createAuthService>;
+    permissionService?: ReturnType<typeof createPermissionService>;
 }) {
     const userRepository = createUserRepository(prisma);
     const roleRepository = createRoleRepository(prisma);
     const orgRepository = createOrgRepository(prisma);
     const permissionRepository = createPermissionRepository(prisma);
+    const configRepository = createConfigRepository(prisma);
 
     const identityService = deps?.identityService ?? createIdentityService({ userRepository });
     const roleService = deps?.roleService ?? createRoleService({ roleRepository, userRepository });
     const orgService = deps?.orgService ?? createOrgService({ orgRepository });
-    createPermissionService({ permissionRepository });
+    const configService = createConfigService({ configRepository });
+    const authService = deps?.authService ?? createAuthService({ userRepository });
+    const permissionService =
+        deps?.permissionService ??
+        createPermissionService({
+            permissionRepository,
+            roleRepository,
+            configService
+        });
+    const authMiddleware = createAuthMiddleware(authService);
 
     const app = express();
 
@@ -45,6 +63,8 @@ export function createApp(deps?: {
     app.use('/api/v1/users', createUserRouter(identityService));
     app.use('/api/v1/roles', createRoleRouter(roleService));
     app.use('/api/v1/org', createOrgRouter(orgService));
+    app.use('/api/v1/auth', createAuthRouter(authService));
+    app.use('/api/v1/permissions', authMiddleware, createPermissionRouter(permissionService));
 
     app.use((_req, res) => {
         res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });
