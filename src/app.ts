@@ -9,6 +9,7 @@ import { createOrgRouter } from './api/routes/org';
 import { createAuthRouter } from './api/routes/auth';
 import { createPermissionRouter } from './api/routes/permissions';
 import { createAuthMiddleware } from './api/middleware/auth';
+import { createRateLimitMiddleware } from './api/middleware/rateLimit';
 import { createIdentityService } from './services/identityService';
 import { createRoleService } from './services/roleService';
 import { createOrgService } from './services/orgService';
@@ -48,6 +49,10 @@ export function createApp(deps?: {
             configService
         });
     const authMiddleware = createAuthMiddleware(authService);
+    const authRouteRateLimit = createRateLimitMiddleware({
+        maxRequests: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 30),
+        windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 60_000)
+    });
 
     const app = express();
 
@@ -63,7 +68,7 @@ export function createApp(deps?: {
     app.use('/api/v1/users', createUserRouter(identityService));
     app.use('/api/v1/roles', createRoleRouter(roleService));
     app.use('/api/v1/org', createOrgRouter(orgService));
-    app.use('/api/v1/auth', createAuthRouter(authService));
+    app.use('/api/v1/auth', authRouteRateLimit, createAuthRouter(authService));
     app.use('/api/v1/permissions', authMiddleware, createPermissionRouter(permissionService));
 
     app.use((_req, res) => {
