@@ -9,7 +9,7 @@ import { createOrgRouter } from './api/routes/org';
 import { createAuthRouter } from './api/routes/auth';
 import { createPermissionRouter } from './api/routes/permissions';
 import { createAuthMiddleware } from './api/middleware/auth';
-import { createRateLimitMiddleware } from './api/middleware/rateLimit';
+import rateLimit from 'express-rate-limit';
 import { createIdentityService } from './services/identityService';
 import { createRoleService } from './services/roleService';
 import { createOrgService } from './services/orgService';
@@ -49,13 +49,17 @@ export function createApp(deps?: {
             configService
         });
     const authMiddleware = createAuthMiddleware(authService);
-    const authRouteRateLimit = createRateLimitMiddleware({
-        maxRequests: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 30),
-        windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 60_000)
+    const authRouteRateLimit = rateLimit({
+        windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 60_000),
+        limit: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 30),
+        standardHeaders: 'draft-7',
+        legacyHeaders: false
     });
-    const permissionRouteRateLimit = createRateLimitMiddleware({
-        maxRequests: Number(process.env.PERMISSION_RATE_LIMIT_MAX ?? 120),
-        windowMs: Number(process.env.PERMISSION_RATE_LIMIT_WINDOW_MS ?? 60_000)
+    const permissionRouteRateLimit = rateLimit({
+        windowMs: Number(process.env.PERMISSION_RATE_LIMIT_WINDOW_MS ?? 60_000),
+        limit: Number(process.env.PERMISSION_RATE_LIMIT_MAX ?? 120),
+        standardHeaders: 'draft-7',
+        legacyHeaders: false
     });
 
     const app = express();
