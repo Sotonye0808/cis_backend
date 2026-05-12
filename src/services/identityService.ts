@@ -10,8 +10,19 @@ type UserRepository = {
     softDelete(id: string): Promise<any>;
 };
 
-export function createIdentityService(deps: { userRepository: UserRepository }) {
-    const { userRepository } = deps;
+type EventService = {
+    queueEvent(input: {
+        eventType: 'USER_CREATED' | 'USER_UPDATED' | 'USER_DEACTIVATED';
+        aggregateId: string;
+        aggregateType: string;
+        data: unknown;
+        metadata?: unknown;
+        actorId?: string | null;
+    }): Promise<any>;
+};
+
+export function createIdentityService(deps: { userRepository: UserRepository; eventService?: EventService }) {
+    const { userRepository, eventService } = deps;
 
     return {
         async createUser(input: CreateUserInput) {
@@ -21,7 +32,7 @@ export function createIdentityService(deps: { userRepository: UserRepository }) 
                 throw new EmailAlreadyExistsError();
             }
 
-            return userRepository.create({
+            const user = await userRepository.create({
                 email: input.email,
                 firstName: input.firstName,
                 lastName: input.lastName,
@@ -31,6 +42,13 @@ export function createIdentityService(deps: { userRepository: UserRepository }) 
                 status: input.status,
                 metadata: input.metadata ?? {}
             });
+            await eventService?.queueEvent({
+                eventType: 'USER_CREATED',
+                aggregateId: user.id,
+                aggregateType: 'canonical_user',
+                data: { userId: user.id, email: user.email, status: user.status }
+            });
+            return user;
         },
         async getUserById(id: string) {
             const user = await userRepository.findById(id);
@@ -55,15 +73,36 @@ export function createIdentityService(deps: { userRepository: UserRepository }) 
         },
         async updateUser(id: string, input: UpdateUserInput) {
             await userRepository.findById(id) ?? (() => { throw new UserNotFoundError(); })();
-            return userRepository.update(id, input);
+            const updated = await userRepository.update(id, input);
+            await eventService?.queueEvent({
+                eventType: 'USER_UPDATED',
+                aggregateId: updated.id,
+                aggregateType: 'canonical_user',
+                data: { userId: updated.id, changes: input }
+            });
+            return updated;
         },
         async deactivateUser(id: string) {
             await userRepository.findById(id) ?? (() => { throw new UserNotFoundError(); })();
-            return userRepository.softDelete(id);
+            const deactivated = await userRepository.softDelete(id);
+            await eventService?.queueEvent({
+                eventType: 'USER_DEACTIVATED',
+                aggregateId: deactivated.id,
+                aggregateType: 'canonical_user',
+                data: { userId: deactivated.id }
+            });
+            return deactivated;
         },
         async deleteUser(id: string) {
             await userRepository.findById(id) ?? (() => { throw new UserNotFoundError(); })();
-            return userRepository.softDelete(id);
+            const deleted = await userRepository.softDelete(id);
+            await eventService?.queueEvent({
+                eventType: 'USER_DEACTIVATED',
+                aggregateId: deleted.id,
+                aggregateType: 'canonical_user',
+                data: { userId: deleted.id }
+            });
+            return deleted;
         }
     };
 }

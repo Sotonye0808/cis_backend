@@ -53,3 +53,27 @@ export class CampusNotFoundError extends AppError {
         super(404, 'CAMPUS_NOT_FOUND', message);
     }
 }
+
+export class UnauthorizedError extends AppError {
+    constructor(message = 'Unauthorized') {
+        super(401, 'UNAUTHORIZED', message);
+    }
+}
+
+export class ForbiddenError extends AppError {
+    constructor(message = 'Forbidden') {
+        super(403, 'FORBIDDEN', message);
+    }
+}
+
+export class InvalidTokenError extends AppError {
+    constructor(message = 'Invalid token') {
+        super(401, 'INVALID_TOKEN', message);
+    }
+}
+
+export class EventSubscriptionNotFoundError extends AppError {
+    constructor(message = 'Event subscription not found') {
+        super(404, 'EVENT_SUBSCRIPTION_NOT_FOUND', message);
+    }
+}
