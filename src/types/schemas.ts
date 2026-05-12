@@ -83,6 +83,42 @@ export const processOutboxSchema = z.object({
     limit: z.number().int().min(1).max(200).optional()
 });
 
+export const platformIntegrationUserSchema = z.object({
+    externalUserId: z.string().trim().min(1),
+    email: z.string().trim().email().max(320),
+    firstName: z.string().trim().min(1).max(100).optional(),
+    lastName: z.string().trim().min(1).max(100).optional(),
+    phoneNumber: z.string().trim().min(3).max(30).optional(),
+    whatsappNumber: z.string().trim().min(3).max(30).optional(),
+    profileImageUrl: z.string().url().optional(),
+    status: userStatusSchema.optional(),
+    metadata: z.record(z.any()).optional()
+});
+
+export const platformSyncUsersSchema = z.object({
+    sourceSystem: z.string().trim().min(1).optional(),
+    users: z.array(platformIntegrationUserSchema).min(1)
+});
+
+export const integrationPlatformSchema = z.enum(['reporting', 'faith-hub']);
+
+export const platformRoleMappingSchema = z.object({
+    platformId: integrationPlatformSchema,
+    platformRoleKey: z.string().trim().min(1).max(100),
+    canonicalRoleKey: z.string().trim().min(1).max(100),
+    permissions: z.array(z.string().trim().min(1)).optional().default([]),
+    inherits: z.array(z.string().trim().min(1)).optional().default([]),
+    notes: z.string().trim().max(500).optional()
+});
+
+export const platformRoleMappingListQuerySchema = z.object({
+    platformId: integrationPlatformSchema.optional()
+});
+
+export const platformRoleMappingBackfillSchema = z.object({
+    platformId: integrationPlatformSchema.optional()
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
@@ -94,3 +130,9 @@ export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type PermissionCheckInput = z.infer<typeof permissionCheckSchema>;
 export type EventSubscriptionInput = z.infer<typeof eventSubscriptionSchema>;
 export type ProcessOutboxInput = z.infer<typeof processOutboxSchema>;
+export type PlatformIntegrationUserInput = z.infer<typeof platformIntegrationUserSchema>;
+export type PlatformSyncUsersInput = z.infer<typeof platformSyncUsersSchema>;
+export type IntegrationPlatformInput = z.infer<typeof integrationPlatformSchema>;
+export type PlatformRoleMappingInput = z.infer<typeof platformRoleMappingSchema>;
+export type PlatformRoleMappingListQueryInput = z.infer<typeof platformRoleMappingListQuerySchema>;
+export type PlatformRoleMappingBackfillInput = z.infer<typeof platformRoleMappingBackfillSchema>;

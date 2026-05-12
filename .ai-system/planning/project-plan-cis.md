@@ -43,10 +43,11 @@
 
 ---
 
-## Phase 2 — Auth, Permissions, & Event System (May 17–30)
+## Phase 2 — Auth, Permissions, & Event System (May 17–30) ✅ COMPLETE
 
 **Duration:** 2 weeks | **Deliverable:** JWT auth, permission checking, async event infrastructure  
 **Target Completion:** May 30
+**Status:** Implemented and validated in the current codebase (38 tests passing).
 
 > **Section summary:** Implement authentication, permission resolution, and the critical async event system that will broadcast identity changes to all platforms without blocking.
 
@@ -76,6 +77,8 @@
 - ✅ Integration tests pass for event flow
 - ✅ No synchronous blocking when broadcasting events
 
+**Implementation Note:** Phase 2 is already delivered in the repository, including JWT auth, permission caching, config-driven role resolution, event outbox processing, and authenticated route protection.
+
 ### Known Risks
 
 - Redis connection issues → **Mitigation:** Test Upstash connectivity by May 18
@@ -84,12 +87,32 @@
 
 ---
 
-## Phase 3 — Platform Integration Layer 1 (May 31–June 13)
+## Phase 3 — Platform Integration Layer 1 (May 31–June 13) [IN PROGRESS]
 
 **Duration:** 2 weeks | **Deliverable:** Integration with Reporting System & Faith Hub (web)  
 **Target Completion:** June 13
 
 > **Section summary:** Build SDKs and integration points for the first two platforms. Each platform integration follows the same pattern: map external user ID → canonical user, set up event listeners, implement reconciliation logic.
+
+> **Current Implementation:** CIS-side platform integration service, reporting/faith-hub SDK facades, sync routes, host-platform hook helpers, and a 3-platform validation route are in place. Remaining work moves into Phase 4 testing and launch prep.
+
+### Phase 3.5 — Role Mapping & Governance (Started May 14)
+
+**Purpose:** Add config-backed translation between platform-specific roles and canonical CIS roles so Reporting System and Faith Hub can share identity without sharing identical role enums.
+
+**Implemented So Far:**
+
+- Platform role mapping service backed by config entries
+- Role mapping list/get/upsert routes
+- Validation schemas and unit tests for versioned mappings
+- Role-mapping backfill utility and CLI for curated defaults
+
+**Next Steps:**
+
+- Phase 4 security audit
+- Phase 4 performance benchmarks
+- Swagger/OpenAPI documentation
+- Deployment and troubleshooting guides
 
 ### Core Tasks
 

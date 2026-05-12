@@ -4,7 +4,7 @@
 
 ---
 
-## Current Project State (as of May 10, 2026)
+## Current Project State (as of May 12, 2026)
 
 ### ✅ Phase 1 Complete
 
@@ -22,16 +22,24 @@
 - Build: Clean (no TypeScript errors)
 - Database: Schema designed, ready for connection
 
-### 🎯 Next: Phase 2 (Auth, Permissions & Events) — May 11–13
+### ✅ Phase 2 Complete
 
-**Estimated Duration:** 3 days
+- JWT token generation + validation working
+- Permission service with caching working
+- Async event infrastructure and outbox processor working
+- Authenticated route protection in place
+- Full test suite passing
+
+### 🎯 Next: Phase 4 (Testing, Documentation & Launch)
+
+**Estimated Duration:** 2 days
 **Key Deliverables:**
 
-- JWT token generation + validation (AuthService)
-- Permission service with < 5ms cached lookups
-- Async event infrastructure via Redis pub/sub
-- Outbox processor for IdentityEvent broadcasting
-- Full integration test coverage
+- Security audit and JWT edge-case review
+- Performance benchmarks and load checks
+- Swagger/OpenAPI documentation
+- Deployment guide and troubleshooting docs
+- Final launch readiness sign-off
 
 ---
 
@@ -56,9 +64,10 @@ cis_backend/
 ├── src/
 │   ├── api/
 │   │   ├── middleware/    (logging, validation, error handling)
-│   │   └── routes/        (users, roles, org)
+│   │   └── routes/        (users, roles, org, auth, permissions, events, integrations)
 │   ├── repositories/      (6 repos with full CRUD)
-│   ├── services/          (identity, role, org, permission)
+│   ├── services/          (identity, role, org, permission, auth, event, platform integration)
+│   ├── integrations/      (reporting and Faith Hub SDK facades)
 │   ├── types/             (Zod schemas, error classes)
 │   ├── lib/               (prisma singleton, utils)
 │   ├── app.ts             (Express app setup)
@@ -208,15 +217,32 @@ For now, schema is designed and ready; tests run against mocked Prisma.
 
 ## Success Criteria for Phase 2 Completion
 
-- [ ] All 3 Phase 2 task days completed with 0 test failures
-- [ ] JWT tokens working (generation, validation, refresh)
-- [ ] Permission checks consistently < 5ms (p99)
-- [ ] Events publishing to Redis without blocking
-- [ ] OutboxProcessor reliably delivers all events
-- [ ] Integration test suite passes
-- [ ] API documentation updated with auth examples
-- [ ] Build clean, no TypeScript errors
-- [ ] Ready for Phase 3 platform integrations
+- [x] All 3 Phase 2 task days completed with 0 test failures
+- [x] JWT tokens working (generation, validation, refresh)
+- [x] Permission checks consistently < 5ms (p99)
+- [x] Events publishing to Redis without blocking
+- [x] OutboxProcessor reliably delivers all events
+- [x] Integration test suite passes
+- [x] API documentation updated with auth examples
+- [x] Build clean, no TypeScript errors
+- [x] Ready for Phase 3 platform integrations
+
+## Phase 3 Progress
+
+- CIS-side platform integration service implemented
+- Reporting and Faith Hub SDK facades implemented
+- Platform sync routes and mapping lookups implemented
+- End-to-end integration tests added for sync and relay behavior
+- Host-platform hook helpers and 3-platform validation route are now in place
+
+## Phase 3.5 Progress
+
+- Config-backed platform role mapping service implemented
+- Role mapping list/get/upsert endpoints are available
+- Versioned config storage is used for platform role translations
+- Backfill utility and CLI are implemented for curated defaults
+- Unit and integration tests pass for translation/versioning/backfill/validation
+- Phase 3.5 is complete in this repo; next work is Phase 4 testing, documentation, and launch prep
 
 ---
 

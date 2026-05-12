@@ -11,7 +11,10 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "backfill:role-mappings": "tsx src/scripts/backfillPlatformRoleMappings.ts",
+    "benchmark:phase4": "tsx src/scripts/benchmarkPhase4.ts",
+    "loadtest:phase4": "tsx src/scripts/loadTestPhase4.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

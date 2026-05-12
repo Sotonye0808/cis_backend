@@ -30,3 +30,28 @@ During Phase 1 completion, code used Prisma 5.x conventions (datasource with url
 - Test with full suite after any ORM upgrade
 
 **Entries added here as lessons are discovered**
+
+---
+
+## Platform Roles Should Be Translated, Not Unified Prematurely
+
+**Context:**
+The estate schemas show that Reporting System, Faith Hub, and DMHicc each define incompatible role systems. Reporting has 12 pastoral roles, MyHarvestHub has commerce roles, and DMHicc has campaign roles. CIS Phase 3.5 added a role mapping layer rather than trying to collapse those enums.
+
+**What We Learned:**
+
+1. Platform roles are translation data, not canonical identity data.
+2. Versioned config entries are a good fit for role mappings because they preserve history and allow safe evolution.
+3. Canonical identity should carry the user, while each platform retains its own role vocabulary.
+
+**Apply When:**
+
+- Designing cross-platform auth or authorization bridges
+- Adding new platforms with different role vocabularies
+- Reviewing whether a field belongs in CIS core or in a platform-specific mapping layer
+
+**Prevention:**
+
+- Avoid merging incompatible role enums into one global enum
+- Store platform-specific mappings in config-backed records with version history
+- Keep canonical identity separate from platform authorization semantics

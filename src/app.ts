@@ -9,6 +9,8 @@ import { createOrgRouter } from './api/routes/org';
 import { createAuthRouter } from './api/routes/auth';
 import { createPermissionRouter } from './api/routes/permissions';
 import { createEventRouter } from './api/routes/events';
+import { createIntegrationRouter } from './api/routes/integrations';
+import { createDocsRouter } from './api/routes/docs';
 import { createAuthMiddleware } from './api/middleware/auth';
 import rateLimit from 'express-rate-limit';
 import { createIdentityService } from './services/identityService';
@@ -20,13 +22,20 @@ import { createConfigService } from './services/configService';
 import { createEventService } from './services/eventService';
 import { createOutboxProcessorService } from './services/outboxProcessorService';
 import { createEventSubscriptionService } from './services/eventSubscriptionService';
+import { createPlatformIntegrationService } from './services/platformIntegrationService';
+import { createPlatformRoleMappingService } from './services/platformRoleMappingService';
+import { createPlatformRoleMappingBackfillService } from './services/platformRoleMappingBackfillService';
+import { createThreePlatformSyncValidationService } from './services/threePlatformSyncValidationService';
 import { createEventBusFromEnv } from './services/eventBus';
+import { createReportingSystemSdk } from './integrations/reportingSystemSdk';
+import { createFaithHubSdk } from './integrations/faithHubSdk';
 import { createUserRepository } from './repositories/userRepository';
 import { createRoleRepository } from './repositories/roleRepository';
 import { createOrgRepository } from './repositories/orgRepository';
 import { createPermissionRepository } from './repositories/permissionRepository';
 import { createConfigRepository } from './repositories/configRepository';
 import { createEventRepository } from './repositories/eventRepository';
+import { createPlatformRepository } from './repositories/platformRepository';
 import { prisma } from './lib/prisma';
 
 export function createApp(deps?: {
@@ -38,6 +47,10 @@ export function createApp(deps?: {
     eventService?: ReturnType<typeof createEventService>;
     outboxProcessorService?: ReturnType<typeof createOutboxProcessorService>;
     eventSubscriptionService?: ReturnType<typeof createEventSubscriptionService>;
+    platformIntegrationService?: ReturnType<typeof createPlatformIntegrationService>;
+    platformRoleMappingService?: ReturnType<typeof createPlatformRoleMappingService>;
+    platformRoleMappingBackfillService?: ReturnType<typeof createPlatformRoleMappingBackfillService>;
+    threePlatformSyncValidationService?: ReturnType<typeof createThreePlatformSyncValidationService>;
 }) {
     const userRepository = createUserRepository(prisma);
     const roleRepository = createRoleRepository(prisma);
@@ -45,6 +58,7 @@ export function createApp(deps?: {
     const permissionRepository = createPermissionRepository(prisma);
     const configRepository = createConfigRepository(prisma);
     const eventRepository = createEventRepository(prisma);
+    const platformRepository = createPlatformRepository(prisma);
     const eventBus = createEventBusFromEnv();
     const eventService = deps?.eventService ?? createEventService({ eventRepository });
 
@@ -52,6 +66,16 @@ export function createApp(deps?: {
     const roleService = deps?.roleService ?? createRoleService({ roleRepository, userRepository, eventService });
     const orgService = deps?.orgService ?? createOrgService({ orgRepository });
     const configService = createConfigService({ configRepository });
+    const platformRoleMappingService =
+        deps?.platformRoleMappingService ??
+        createPlatformRoleMappingService({
+            configRepository
+        });
+    const platformRoleMappingBackfillService =
+        deps?.platformRoleMappingBackfillService ??
+        createPlatformRoleMappingBackfillService({
+            platformRoleMappingService
+        });
     const authService = deps?.authService ?? createAuthService({ userRepository });
     const permissionService =
         deps?.permissionService ??
@@ -71,6 +95,23 @@ export function createApp(deps?: {
         createEventSubscriptionService({
             eventBus
         });
+    const platformIntegrationService =
+        deps?.platformIntegrationService ??
+        createPlatformIntegrationService({
+            userRepository,
+            platformRepository,
+            eventService,
+            eventBus
+        });
+    const threePlatformSyncValidationService =
+        deps?.threePlatformSyncValidationService ??
+        createThreePlatformSyncValidationService({
+            platformIntegrationService,
+            platformRoleMappingService,
+            platformRoleMappingBackfillService
+        });
+    const reportingSdk = createReportingSystemSdk(platformIntegrationService);
+    const faithHubSdk = createFaithHubSdk(platformIntegrationService);
     const authMiddleware = createAuthMiddleware(authService);
     const authRouteRateLimit = rateLimit({
         windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 60_000),
@@ -107,6 +148,15 @@ export function createApp(deps?: {
         createPermissionRouter(permissionService)
     );
     app.use('/api/v1/events', createEventRouter(eventSubscriptionService, outboxProcessorService));
+    app.use('/api/v1/integrations', authMiddleware, createIntegrationRouter({
+        reportingSdk,
+        faithHubSdk,
+        platformIntegrationService,
+        platformRoleMappingService,
+        platformRoleMappingBackfillService,
+        threePlatformSyncValidationService
+    }));
+    app.use('/api/docs', createDocsRouter());
 
     app.use((_req, res) => {
         res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' } });

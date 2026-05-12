@@ -58,6 +58,85 @@ describe('app routes', () => {
         deleteSubscription: jest.fn().mockResolvedValue({ id: 'sub-1', deleted: true })
     };
 
+    const platformIntegrationService = {
+        syncUsers: jest.fn().mockResolvedValue({
+            platformId: 'reporting',
+            sourceSystem: 'reporting_users',
+            total: 1,
+            created: 1,
+            linked: 0,
+            updated: 0,
+            mappings: [{ platformId: 'reporting', externalUserId: 'rep-1', canonicalUserId: 'user-1', action: 'created' }]
+        }),
+        getMapping: jest.fn().mockResolvedValue({
+            platformId: 'reporting',
+            externalUserId: 'rep-1',
+            canonicalUser: { id: 'user-1' }
+        })
+    };
+
+    const platformRoleMappingService = {
+        listMappings: jest.fn().mockResolvedValue([
+            {
+                platformId: 'reporting',
+                platformRoleKey: 'SPO',
+                canonicalRoleKey: 'PASTOR',
+                permissions: ['users.read'],
+                inherits: ['MEMBER'],
+                version: 1
+            },
+            {
+                platformId: 'faith-hub',
+                platformRoleKey: 'MEMBER',
+                canonicalRoleKey: 'MEMBER',
+                permissions: ['users.read'],
+                inherits: [],
+                version: 1
+            }
+        ]),
+        getMapping: jest.fn().mockImplementation(async (platformId: string, platformRoleKey: string) => {
+            if (platformId === 'reporting' && platformRoleKey === 'SPO') {
+                return {
+                    platformId: 'reporting',
+                    platformRoleKey: 'SPO',
+                    canonicalRoleKey: 'PASTOR',
+                    permissions: ['users.read'],
+                    inherits: ['MEMBER'],
+                    version: 1
+                };
+            }
+
+            if (platformId === 'faith-hub' && platformRoleKey === 'MEMBER') {
+                return {
+                    platformId: 'faith-hub',
+                    platformRoleKey: 'MEMBER',
+                    canonicalRoleKey: 'MEMBER',
+                    permissions: ['users.read'],
+                    inherits: [],
+                    version: 1
+                };
+            }
+
+            return null;
+        }),
+        upsertMapping: jest.fn().mockResolvedValue({
+            platformId: 'reporting',
+            platformRoleKey: 'SPO',
+            canonicalRoleKey: 'PASTOR',
+            permissions: ['users.read'],
+            inherits: ['MEMBER'],
+            version: 1
+        }),
+        translateRole: jest.fn().mockResolvedValue({
+            platformId: 'reporting',
+            platformRoleKey: 'SPO',
+            canonicalRoleKey: 'PASTOR',
+            permissions: ['users.read'],
+            inherits: ['MEMBER'],
+            version: 1
+        })
+    };
+
     const app = createApp({
         identityService,
         roleService,
@@ -65,7 +144,17 @@ describe('app routes', () => {
         authService: authService as any,
         permissionService: permissionService as any,
         outboxProcessorService: outboxProcessorService as any,
-        eventSubscriptionService: eventSubscriptionService as any
+        eventSubscriptionService: eventSubscriptionService as any,
+        platformIntegrationService: platformIntegrationService as any,
+        platformRoleMappingService: platformRoleMappingService as any,
+        platformRoleMappingBackfillService: {
+            backfill: jest.fn().mockResolvedValue({
+                requestedPlatformId: null,
+                total: 2,
+                created: 2,
+                skipped: 0
+            })
+        } as any
     });
 
     it('responds to health checks', async () => {
@@ -187,5 +276,96 @@ describe('app routes', () => {
         expect(eventSubscriptionService.getMessages).toHaveBeenCalledWith('sub-1');
         expect(outboxProcessorService.processPending).toHaveBeenCalledWith(10);
         expect(eventSubscriptionService.deleteSubscription).toHaveBeenCalledWith('sub-1');
+    });
+
+    it('covers platform integration route surface', async () => {
+        const authHeader = { Authorization: 'Bearer access-token' };
+
+        const reportingSyncResponse = await request(app)
+            .post('/api/v1/integrations/reporting/sync')
+            .set(authHeader)
+            .send({
+                sourceSystem: 'reporting_users',
+                users: [
+                    {
+                        externalUserId: 'rep-1',
+                        email: 'member@example.com',
+                        firstName: 'Member',
+                        lastName: 'One'
+                    }
+                ]
+            });
+
+        const faithHubSyncResponse = await request(app)
+            .post('/api/v1/integrations/faith-hub/sync')
+            .set(authHeader)
+            .send({
+                sourceSystem: 'faith_hub_users',
+                users: [
+                    {
+                        externalUserId: 'fh-1',
+                        email: 'faith@example.com',
+                        firstName: 'Faith',
+                        lastName: 'Hub'
+                    }
+                ]
+            });
+
+        const mappingResponse = await request(app)
+            .get('/api/v1/integrations/reporting/mappings/rep-1')
+            .set(authHeader);
+
+        const statusResponse = await request(app)
+            .get('/api/v1/integrations/faith-hub/status')
+            .set(authHeader);
+
+        expect(reportingSyncResponse.status).toBe(201);
+        expect(faithHubSyncResponse.status).toBe(201);
+        expect(mappingResponse.status).toBe(200);
+        expect(statusResponse.status).toBe(200);
+        expect(platformIntegrationService.syncUsers).toHaveBeenCalled();
+        expect(platformIntegrationService.getMapping).toHaveBeenCalledWith('reporting', 'rep-1');
+    });
+
+    it('covers platform role mapping route surface', async () => {
+        const authHeader = { Authorization: 'Bearer access-token' };
+
+        const listResponse = await request(app)
+            .get('/api/v1/integrations/role-mappings')
+            .query({ platformId: 'reporting' })
+            .set(authHeader);
+
+        const upsertResponse = await request(app)
+            .post('/api/v1/integrations/role-mappings')
+            .set(authHeader)
+            .send({
+                platformId: 'reporting',
+                platformRoleKey: 'SPO',
+                canonicalRoleKey: 'PASTOR',
+                permissions: ['users.read'],
+                inherits: ['MEMBER']
+            });
+
+        const translateResponse = await request(app)
+            .get('/api/v1/integrations/role-mappings/reporting/SPO')
+            .set(authHeader);
+
+        expect(listResponse.status).toBe(200);
+        expect(upsertResponse.status).toBe(201);
+        expect(translateResponse.status).toBe(200);
+        expect(platformRoleMappingService.listMappings).toHaveBeenCalledWith('reporting');
+        expect(platformRoleMappingService.upsertMapping).toHaveBeenCalled();
+        expect(platformRoleMappingService.getMapping).toHaveBeenCalledWith('reporting', 'SPO');
+    });
+
+    it('covers three-platform sync validation', async () => {
+        const response = await request(app)
+            .post('/api/v1/integrations/validation/three-platform-sync')
+            .set('Authorization', 'Bearer access-token');
+
+        expect(response.status).toBe(200);
+        expect(response.body.data.status).toBe('ok');
+        expect(response.body.data.roleMappings.reportingSPO).toBe('PASTOR');
+        expect(response.body.data.roleMappings.faithHubMember).toBe('MEMBER');
     });
 });
