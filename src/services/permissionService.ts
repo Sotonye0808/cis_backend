@@ -124,10 +124,7 @@ export function createPermissionService(deps: {
             }
 
             const assignments = await roleRepository.findForUser(userId);
-            const hasPermission = await assignments.reduce<Promise<boolean>>(async (accPromise, assignment) => {
-                if (await accPromise) {
-                    return true;
-                }
+            const candidates = assignments.filter((assignment) => {
                 if (!assignment.roleId || !assignment.role) {
                     return false;
                 }
@@ -137,9 +134,16 @@ export function createPermissionService(deps: {
                 if (scopeId && assignment.scopeId && assignment.scopeId !== scopeId) {
                     return false;
                 }
-                const permissions = await getRolePermissions(assignment.roleId);
-                return permissions.includes(permissionKey);
-            }, Promise.resolve(false));
+                return true;
+            });
+
+            const checks = await Promise.all(
+                candidates.map(async (assignment) => {
+                    const permissions = await getRolePermissions(assignment.roleId as string);
+                    return permissions.includes(permissionKey);
+                })
+            );
+            const hasPermission = checks.some(Boolean);
 
             userPermissionCache.set(cacheKey, {
                 hasPermission,

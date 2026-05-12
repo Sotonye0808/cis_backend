@@ -44,8 +44,9 @@ export function createOutboxProcessorService(deps: {
                 } catch (error) {
                     failed += 1;
                     const message = error instanceof Error ? error.message : 'Unknown event processing error';
-                    logger.error({ outboxId: item.id, error: message }, 'Failed to publish outbox event');
-                    await eventRepository.markOutboxFailed(item.id, message);
+                    const stack = error instanceof Error ? error.stack : undefined;
+                    logger.error({ outboxId: item.id, error: message, stack }, 'Failed to publish outbox event');
+                    await eventRepository.markOutboxFailed(item.id, stack ? `${message}\n${stack}` : message);
                 }
             }
 

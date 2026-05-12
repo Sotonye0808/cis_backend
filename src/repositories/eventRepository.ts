@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
+const MAX_ERROR_MESSAGE_LENGTH = 1000;
+
 export function createEventRepository(prisma: PrismaClient) {
     return {
         createEventWithOutbox(data: Prisma.IdentityEventCreateInput) {
@@ -40,7 +42,7 @@ export function createEventRepository(prisma: PrismaClient) {
                 where: { id },
                 data: {
                     failureCount: { increment: 1 },
-                    lastError: errorMessage.slice(0, 1000),
+                    lastError: errorMessage.slice(0, MAX_ERROR_MESSAGE_LENGTH),
                     processingStartedAt: null
                 }
             });

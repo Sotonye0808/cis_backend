@@ -20,7 +20,11 @@ export function startOutboxWorker(deps: { outboxProcessor: OutboxProcessor; inte
                 logger.info({ result }, 'Processed identity event outbox batch');
             }
         } catch (error) {
-            logger.error({ error }, 'Outbox worker iteration failed');
+            if (error instanceof Error) {
+                logger.error({ message: error.message, stack: error.stack }, 'Outbox worker iteration failed');
+            } else {
+                logger.error({ error }, 'Outbox worker iteration failed');
+            }
         } finally {
             running = false;
         }

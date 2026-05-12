@@ -17,8 +17,12 @@ export function createAuthMiddleware(authService: AuthService) {
             return next(new UnauthorizedError('Missing bearer token'));
         }
 
-        const payload = authService.verifyAccessToken(token);
-        (req as any).auth = { userId: payload.sub };
-        return next();
+        try {
+            const payload = authService.verifyAccessToken(token);
+            (req as any).auth = { userId: payload.sub };
+            return next();
+        } catch (error) {
+            return next(error);
+        }
     };
 }

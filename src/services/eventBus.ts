@@ -1,4 +1,4 @@
-import { createClient, type RedisClientType } from 'redis';
+import { createClient } from 'redis';
 import { logger } from '../lib/logger';
 
 export type PublishedEvent = {
@@ -72,8 +72,12 @@ export function createRedisEventBus(redisUrl: string): EventBus {
         async subscribe(channel: string, handler: EventHandler) {
             await ensureConnected();
             const listener = async (message: string) => {
-                const parsed = JSON.parse(message) as PublishedEvent;
-                await handler(parsed);
+                try {
+                    const parsed = JSON.parse(message) as PublishedEvent;
+                    await handler(parsed);
+                } catch (error) {
+                    logger.error({ channel, error }, 'Failed to process Redis pub/sub message');
+                }
             };
             await subscriber.subscribe(channel, listener);
 

@@ -1,5 +1,6 @@
 import { EventSubscriptionNotFoundError } from '../types/errors';
 import type { EventBus, PublishedEvent } from './eventBus';
+import { randomUUID } from 'crypto';
 
 type Subscription = {
     id: string;
@@ -14,7 +15,7 @@ export function createEventSubscriptionService(deps: { eventBus: EventBus; maxBu
 
     return {
         async createSubscription(channel: string) {
-            const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            const id = randomUUID();
             const messages: PublishedEvent[] = [];
             const unsubscribe = await eventBus.subscribe(channel, (message) => {
                 messages.push(message);
