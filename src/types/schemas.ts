@@ -75,6 +75,14 @@ export const permissionCheckSchema = z.object({
     scopeId: z.string().trim().min(1).optional()
 });
 
+export const eventSubscriptionSchema = z.object({
+    channel: z.string().trim().min(1).default('identity:*')
+});
+
+export const processOutboxSchema = z.object({
+    limit: z.number().int().min(1).max(200).optional()
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
@@ -84,3 +92,5 @@ export type CreateOrgGroupInput = z.infer<typeof createOrgGroupSchema>;
 export type IssueTokenInput = z.infer<typeof issueTokenSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type PermissionCheckInput = z.infer<typeof permissionCheckSchema>;
+export type EventSubscriptionInput = z.infer<typeof eventSubscriptionSchema>;
+export type ProcessOutboxInput = z.infer<typeof processOutboxSchema>;

@@ -48,12 +48,24 @@ describe('app routes', () => {
         userHasPermission: jest.fn().mockResolvedValue(true)
     };
 
+    const outboxProcessorService = {
+        processPending: jest.fn().mockResolvedValue({ picked: 1, processed: 1, failed: 0 })
+    };
+
+    const eventSubscriptionService = {
+        createSubscription: jest.fn().mockResolvedValue({ id: 'sub-1', channel: 'identity:*' }),
+        getMessages: jest.fn().mockReturnValue([{ eventType: 'USER_CREATED' }]),
+        deleteSubscription: jest.fn().mockResolvedValue({ id: 'sub-1', deleted: true })
+    };
+
     const app = createApp({
         identityService,
         roleService,
         orgService,
         authService: authService as any,
-        permissionService: permissionService as any
+        permissionService: permissionService as any,
+        outboxProcessorService: outboxProcessorService as any,
+        eventSubscriptionService: eventSubscriptionService as any
     });
 
     it('responds to health checks', async () => {
@@ -155,5 +167,25 @@ describe('app routes', () => {
         expect(authService.issueTokensForUser).toHaveBeenCalledWith('user-1');
         expect(authService.refreshTokens).toHaveBeenCalledWith('refresh-token');
         expect(permissionService.userHasPermission).toHaveBeenCalledWith('user-1', 'users.read', undefined);
+    });
+
+    it('covers event route surface', async () => {
+        const subscriptionResponse = await request(app)
+            .post('/api/v1/events/subscriptions')
+            .send({ channel: 'identity:*' });
+        const messagesResponse = await request(app).get('/api/v1/events/subscriptions/sub-1/messages');
+        const processResponse = await request(app)
+            .post('/api/v1/events/outbox/process')
+            .send({ limit: 10 });
+        const deleteResponse = await request(app).delete('/api/v1/events/subscriptions/sub-1');
+
+        expect(subscriptionResponse.status).toBe(201);
+        expect(messagesResponse.status).toBe(200);
+        expect(processResponse.status).toBe(200);
+        expect(deleteResponse.status).toBe(200);
+        expect(eventSubscriptionService.createSubscription).toHaveBeenCalledWith('identity:*');
+        expect(eventSubscriptionService.getMessages).toHaveBeenCalledWith('sub-1');
+        expect(outboxProcessorService.processPending).toHaveBeenCalledWith(10);
+        expect(eventSubscriptionService.deleteSubscription).toHaveBeenCalledWith('sub-1');
     });
 });

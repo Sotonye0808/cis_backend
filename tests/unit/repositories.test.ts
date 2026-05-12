@@ -1,4 +1,5 @@
 import { createConfigRepository } from '../../src/repositories/configRepository';
+import { createEventRepository } from '../../src/repositories/eventRepository';
 import { createOrgRepository } from '../../src/repositories/orgRepository';
 import { createPermissionRepository } from '../../src/repositories/permissionRepository';
 import { createPlatformRepository } from '../../src/repositories/platformRepository';
@@ -46,6 +47,13 @@ describe('repository factories', () => {
             findFirst: jest.fn(),
             create: jest.fn(),
             findMany: jest.fn()
+        },
+        identityEvent: {
+            create: jest.fn()
+        },
+        identityEventOutbox: {
+            findMany: jest.fn(),
+            update: jest.fn()
         }
     } as any;
 
@@ -132,5 +140,18 @@ describe('repository factories', () => {
         expect(await repository.findLatest('namespace', 'bootstrap')).toEqual({ key: 'bootstrap' });
         expect(await repository.create({} as any)).toEqual({ key: 'bootstrap' });
         expect(await repository.listByNamespace('namespace')).toEqual([{ key: 'bootstrap' }]);
+    });
+
+    it('covers event repository methods', async () => {
+        const repository = createEventRepository(prisma);
+        prisma.identityEvent.create.mockResolvedValue({ eventId: 'evt-1' });
+        prisma.identityEventOutbox.findMany.mockResolvedValue([{ id: 'outbox-1' }]);
+        prisma.identityEventOutbox.update.mockResolvedValue({ id: 'outbox-1' });
+
+        expect(await repository.createEventWithOutbox({} as any)).toEqual({ eventId: 'evt-1' });
+        expect(await repository.findPendingOutbox(10)).toEqual([{ id: 'outbox-1' }]);
+        expect(await repository.markOutboxProcessing('outbox-1')).toEqual({ id: 'outbox-1' });
+        expect(await repository.markOutboxProcessed('outbox-1')).toEqual({ id: 'outbox-1' });
+        expect(await repository.markOutboxFailed('outbox-1', 'boom')).toEqual({ id: 'outbox-1' });
     });
 });

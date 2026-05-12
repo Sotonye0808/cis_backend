@@ -71,3 +71,9 @@ export class InvalidTokenError extends AppError {
         super(401, 'INVALID_TOKEN', message);
     }
 }
+
+export class EventSubscriptionNotFoundError extends AppError {
+    constructor(message = 'Event subscription not found') {
+        super(404, 'EVENT_SUBSCRIPTION_NOT_FOUND', message);
+    }
+}
