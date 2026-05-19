@@ -183,21 +183,21 @@
 
 ### Day 1 (May 15): Testing & Security
 
-- [ ] **T4.1** Security audit: input validation, JWT edge cases, secret handling
-- [ ] **T4.2** Performance benchmarks: latency under load (100 req/sec, p99 < 100ms)
-- [ ] **T4.3** Load test: sustained 100 req/sec, no timeouts
+- [x] **T4.1** Security audit: input validation, JWT edge cases, secret handling
+- [x] **T4.2** Performance benchmarks: latency under load (100 req/sec, p99 < 100ms)
+- [x] **T4.3** Load test: sustained 100 req/sec, no timeouts
 - [ ] **T4.4** Final code review: all PRs merged, no blockers
-- [ ] **T4.5** Coverage verification: 70%+ across all modules
+- [x] **T4.5** Coverage verification: 70%+ across all modules
 
 **Completion Check:** Security passed, performance targets met, coverage confirmed
 
 ### Day 2 (May 16): Documentation & Launch
 
-- [ ] **T4.6** Create/finalize Swagger/OpenAPI documentation
-- [ ] **T4.7** Create deployment guide (Docker, environment vars, database setup)
-- [ ] **T4.8** Create platform migration guides (if not already done)
-- [ ] **T4.9** Create troubleshooting guide (common issues, solutions)
-- [ ] **T4.10** Prepare team training materials
+- [x] **T4.6** Create/finalize Swagger/OpenAPI documentation
+- [x] **T4.7** Create deployment guide (Docker, environment vars, database setup)
+- [x] **T4.8** Create platform migration guides (if not already done)
+- [x] **T4.9** Create troubleshooting guide (common issues, solutions)
+- [x] **T4.10** Prepare team training materials
 - [ ] **T4.11** Final sign-off: tech lead confirms launch readiness
 - [ ] **T4.12** Deploy to staging/production
 

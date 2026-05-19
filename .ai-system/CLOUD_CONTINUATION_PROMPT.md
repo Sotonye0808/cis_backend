@@ -35,11 +35,11 @@
 **Estimated Duration:** 2 days
 **Key Deliverables:**
 
-- Security audit and JWT edge-case review
-- Performance benchmarks and load checks
-- Swagger/OpenAPI documentation
-- Deployment guide and troubleshooting docs
-- Final launch readiness sign-off
+- Security audit and JWT edge-case review are complete
+- Performance benchmarks and load checks are complete
+- Swagger/OpenAPI documentation is complete
+- Deployment guide and troubleshooting docs are complete
+- Final launch readiness sign-off and deploy remain
 
 ---
 
@@ -242,7 +242,15 @@ For now, schema is designed and ready; tests run against mocked Prisma.
 - Versioned config storage is used for platform role translations
 - Backfill utility and CLI are implemented for curated defaults
 - Unit and integration tests pass for translation/versioning/backfill/validation
-- Phase 3.5 is complete in this repo; next work is Phase 4 testing, documentation, and launch prep
+- Phase 3.5 is complete in this repo; next work is Phase 4 final sign-off and deployment
+
+## Phase 4 Progress
+
+- Security audit completed for current auth, validation, and error-handling paths
+- OpenAPI endpoint implemented at `/api/docs/openapi.json`
+- Deployment, troubleshooting, training, and launch checklist docs added
+- Benchmark and load-test scripts added and validated locally
+- Remaining work: final code review sign-off and staging/production deployment
 
 ---
 
