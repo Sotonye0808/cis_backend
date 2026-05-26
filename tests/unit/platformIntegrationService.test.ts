@@ -12,7 +12,8 @@ describe('platformIntegrationService', () => {
     const platformRepository = {
         findMappingByExternalId: jest.fn(),
         findCanonicalUserByPlatform: jest.fn(),
-        createMapping: jest.fn()
+        createMapping: jest.fn(),
+        findMappingsByCanonicalUserId: jest.fn()
     };
 
     const eventService = {

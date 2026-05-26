@@ -12,6 +12,7 @@ type PlatformRepository = {
     findMappingByExternalId(platformId: string, externalUserId: string): Promise<any | null>;
     findCanonicalUserByPlatform(platformId: string, externalUserId: string): Promise<any | null>;
     createMapping(data: Prisma.PlatformUserMappingCreateInput): Promise<any>;
+    findMappingsByCanonicalUserId(canonicalUserId: string): Promise<Array<{ platformId: string; externalUserId: string; canonicalUser?: any }>>;
 };
 
 type EventService = {
@@ -135,7 +136,7 @@ export function createPlatformIntegrationService(deps: {
             }
 
             const mappings = await platformRepository.findMappingsByCanonicalUserId(canonicalUser.id);
-            const platforms = [...new Set(mappings.map(m => m.platformId))];
+            const platforms: string[] = [...new Set(mappings.map((m: { platformId: string }) => m.platformId))];
 
             return {
                 exists: true,
