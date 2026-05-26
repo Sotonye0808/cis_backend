@@ -137,7 +137,7 @@ export function createApp(deps?: {
         res.json({ status: 'ok', service: 'cis-backend' });
     });
 
-    app.use('/api/v1/users', createUserRouter(identityService));
+    app.use('/api/v1/users', createUserRouter(identityService, platformIntegrationService));
     app.use('/api/v1/roles', createRoleRouter(roleService));
     app.use('/api/v1/org', createOrgRouter(orgService));
     app.use('/api/v1/auth', authRouteRateLimit, createAuthRouter(authService));

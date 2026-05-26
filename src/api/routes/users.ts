@@ -13,7 +13,18 @@ type IdentityService = {
     deleteUser(id: string): Promise<any>;
 };
 
-export function createUserRouter(identityService: IdentityService) {
+type PlatformIntegrationService = {
+    checkEmailCrossPlatform(email: string): Promise<{
+        exists: boolean;
+        canonicalUser: { id: string; email: string; firstName: string | null; lastName: string | null } | null;
+        platforms: string[];
+    }>;
+};
+
+export function createUserRouter(
+    identityService: IdentityService,
+    platformIntegrationService?: PlatformIntegrationService
+) {
     const router = Router();
 
     router.get(
@@ -32,6 +43,19 @@ export function createUserRouter(identityService: IdentityService) {
             const email = String(req.params.email);
             const user = await identityService.getUserByEmail(email);
             res.json({ data: user });
+        })
+    );
+
+    router.get(
+        '/check-email/:email',
+        handleAsync(async (req, res) => {
+            const email = String(req.params.email);
+            if (!platformIntegrationService) {
+                res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Platform integration service not configured' } });
+                return;
+            }
+            const result = await platformIntegrationService.checkEmailCrossPlatform(email);
+            res.json({ data: result });
         })
     );
 

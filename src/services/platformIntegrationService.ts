@@ -124,6 +124,30 @@ export function createPlatformIntegrationService(deps: {
                 mappings: results
             };
         },
+        async checkEmailCrossPlatform(email: string) {
+            const canonicalUser = await userRepository.findByEmail(email);
+            if (!canonicalUser) {
+                return {
+                    exists: false,
+                    canonicalUser: null,
+                    platforms: [] as string[]
+                };
+            }
+
+            const mappings = await platformRepository.findMappingsByCanonicalUserId(canonicalUser.id);
+            const platforms = [...new Set(mappings.map(m => m.platformId))];
+
+            return {
+                exists: true,
+                canonicalUser: {
+                    id: canonicalUser.id,
+                    email: canonicalUser.email,
+                    firstName: canonicalUser.firstName,
+                    lastName: canonicalUser.lastName
+                },
+                platforms
+            };
+        },
         getMapping(platformId: string, externalUserId: string) {
             return platformRepository.findCanonicalUserByPlatform(platformId, externalUserId);
         },

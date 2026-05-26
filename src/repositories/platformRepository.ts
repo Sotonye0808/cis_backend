@@ -16,6 +16,12 @@ export function createPlatformRepository(prisma: PrismaClient) {
         },
         createMapping(data: Prisma.PlatformUserMappingCreateInput) {
             return prisma.platformUserMapping.create({ data });
+        },
+        findMappingsByCanonicalUserId(canonicalUserId: string) {
+            return prisma.platformUserMapping.findMany({
+                where: { canonicalUserId },
+                include: { canonicalUser: true }
+            });
         }
     };
 }

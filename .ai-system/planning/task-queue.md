@@ -177,6 +177,17 @@
 
 ---
 
+## Phase 3.6: Cross-Platform Account Detection Interface (May 26)
+
+> **Duration:** 1 day | **Deliverable:** Email-based cross-platform account check endpoint for client apps
+
+- [x] **T3.22** Add `findMappingsByCanonicalUserId` to platform repository
+- [x] **T3.23** Add `checkEmailCrossPlatform` method to platform integration service
+- [x] **T3.24** Add `GET /api/users/check-email/:email` route to users router
+- [x] **T3.25** Wire platform integration service into users router
+- [ ] **T3.26** Write unit tests for checkEmailCrossPlatform
+- [ ] **T3.27** Add to API documentation
+
 ## Phase 4: Testing, Documentation & Launch (May 15–16)
 
 > **Duration:** 2 days | **Deliverable:** Production-ready CIS, full documentation, team trained

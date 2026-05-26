@@ -27,4 +27,21 @@
 
 ## Decisions
 
-[Entries added here as decisions are made]
+## Cross-Platform Email Check Endpoint
+
+**Decision:** Added `GET /api/v1/users/check-email/:email` to the CIS backend to let client apps check whether a given email already has a CanonicalUser with PlatformUserMappings on other platforms.
+**Date:** 2026-05-26
+**Made by:** AI implementation session
+
+**Reason:**
+Client apps (MyHarvestHub, Reporting System, DMHicc) had no way to detect during signup whether a user's email was already associated with accounts on other platforms. The platformIntegrationService already tracked this data but exposed no public endpoint for client apps to query it pre-signup.
+
+**Alternatives Considered:**
+- Reuse existing `GET /users/by-email/:email` and have clients infer platform presence from the user response (rejected: the existing endpoint doesn't include platform mapping data, and adding it would break the existing response contract)
+- Add the check as part of the auth token endpoint (rejected: mixes auth concerns with platform discovery)
+
+**Implications:**
+- Client apps can now query `GET /api/v1/users/check-email/:email` to determine if an email has accounts on other platforms
+- The endpoint returns `{ exists, canonicalUser, platforms[] }`
+- The platform integration service is now wired into the users router
+- When CIS is not configured, client apps silently skip the check
